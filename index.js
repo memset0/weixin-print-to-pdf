@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         微信公众号 PDF 导出脚本
 // @namespace    mem.ac/weixin-print-to-pdf
-// @version      1.1.1
-// @description  方便地导出公众号文章中以图片形式上传的试题，方便您一键开卷！
+// @version      1.1.2
+// @description  方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
 // @author       memset0
 // @license      AGPL-v3.0
 // @match        https://mp.weixin.qq.com/s*
