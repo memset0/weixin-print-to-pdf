@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+  watch:
+    types: started
+  workflow_dispatch:
+  
+jobs:
+  curl:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 自动刷新 CDN 缓存
+      uses: wei/curl@master
+      with:
+        args: https://purge.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
