@@ -7,10 +7,15 @@ on:
   workflow_dispatch:
   
 jobs:
-  curl:
+  cdn-refresh:
     runs-on: ubuntu-latest
     steps:
     - name: 自动刷新 CDN 缓存
       uses: wei/curl@master
       with:
         args: https://purge.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
+
+    - name: 尝试访问 CDN 文件
+      uses: wei/curl@master
+      with:
+        args: https://cdn.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
