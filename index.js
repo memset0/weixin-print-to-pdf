@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微信公众号 PDF 导出脚本
 // @namespace    mem.ac/weixin-print-to-pdf
-// @version      1.2.0
+// @version      1.2.1
 // @description  方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
 // @author       memset0
 // @license      AGPL-v3.0
@@ -104,7 +104,7 @@ async function printToPdf(width, height, margin) {
     // style of page containers
     html += '<style>' +
         'div.page { page-break-after: always; display: flex; justify-content: center; align-items: center; }' +
-        'div.page>img { height: 100%; max-width: 100%; max-height: 100%; }' +
+        'div.page>img { width: 100%; max-width: 100%; max-height: 100%; }' +
         'div.page>img { border: solid 1px #fff0; } /* this line is magic */' +
         '</style>';
 
