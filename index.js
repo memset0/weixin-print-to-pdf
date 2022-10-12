@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         微信公众号 PDF 导出脚本
 // @namespace    mem.ac/weixin-print-to-pdf
-// @version      1.1.2
+// @version      1.2.0
 // @description  方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
 // @author       memset0
 // @license      AGPL-v3.0
@@ -12,6 +12,17 @@
 // ==/UserScript==
 
 const scrollSpeed = 50;
+const minimalImageSize = 100;
+
+// A4 210mm * 297mm
+// const pageWidth = 210;
+// const pageHeight = 297;
+
+// A4 8.3inch * 11.7inch
+const pageWidth = 797 /* 796.8 */;
+const pageHeight = 1123 /* 1123.2 */;
+
+const pageMargin = 0;
 
 function log(...args) {
     console.log('[@memset0/weixin-print-to-pdf]', ...args);
@@ -81,14 +92,10 @@ function scrollTo(type) {
     });
 }
 
-async function printToPdf() {
-    const width = 210;
-    const height = 297;
-    const margin = 0;
-
+async function printToPdf(width, height, margin) {
     // await scrollTo('top');
     // await scrollTo('bottom');
-    
+
     let html = '';
 
     // normalize browser
@@ -97,7 +104,8 @@ async function printToPdf() {
     // style of page containers
     html += '<style>' +
         'div.page { page-break-after: always; display: flex; justify-content: center; align-items: center; }' +
-        'div.page>img { max-width: 100%; max-height: 100%; }' +
+        'div.page>img { height: 100%; max-width: 100%; max-height: 100%; }' +
+        'div.page>img { border: solid 1px #fff0; } /* this line is magic */' +
         '</style>';
 
     // page settings
@@ -107,9 +115,11 @@ async function printToPdf() {
 
     for (const $image of document.getElementById('js_content').querySelectorAll('img')) {
         const imageSrc = $image.getAttribute('data-src');
+        const imageWidth = $image.getAttribute('width');
         if (!imageSrc) { continue; }
+        if (imageWidth && imageWidth < minimalImageSize) { continue; }
         html += '<div class="page"><img src="' + imageSrc + '"></div>';
-        // log(imageSrc);
+        log(imageWidth, imageSrc);
     }
 
     // log(html);
@@ -125,7 +135,7 @@ function initizePrintButton() {
         $buttonPrint.style = 'padding-left: 4px; padding-right: 4px;'
         $buttonPrint.onclick = () => {
             log('Triggered by', buttonName);
-            printToPdf();
+            printToPdf(pageWidth, pageHeight, pageMargin);
         }
         return $buttonPrint;
     }
