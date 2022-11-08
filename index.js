@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                微信公众号 PDF 导出脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.3.1
+// @version             1.4.1
 // @description         方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
@@ -10,21 +10,6 @@
 // @downloadurl         https://cdn.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
 // @run-at              document-start
 // ==/UserScript==
-
-const scrollSpeed = 50;
-const minimalImageSize = 100;
-
-// A4 210mm * 297mm
-// const pageWidth = 210;
-// const pageHeight = 297;
-
-// A4 8.3inch * 11.7inch
-const pageWidth = 797 /* 796.8 */;
-const pageHeight = 1123 /* 1123.2 */;
-
-const pageZoom = 1;
-
-const pageMargin = 0;
 
 const CSS = `
     .mem-print-container {
@@ -44,7 +29,61 @@ function log(...args) {
     console.log('[@memset0/weixin-print-to-pdf]', ...args);
 }
 
+function isInteger(value) {
+    const converted = +value;
+    return !isNaN(converted) && Number.isInteger(converted);
+}
+
+function applyFilter(iterable, filterPattern) {
+    const illegalFilter = (msg) => (alert('Illegal filter: ' + String(msg)), []);
+    const flag = [];
+    for (const _ in iterable) {
+        flag.push(false);
+    }
+    if (!filterPattern || filterPattern == '-') {
+        for (const i in flag) {
+            flag[+i] = true;
+        }
+    } else {
+        const filters = filterPattern.split(',');
+        for (const filter of filters) {
+            if (filter.includes('-')) {
+                const splited = filter.split('-');
+                if (splited.length > 2) {
+                    return illegalFilter('wrong interval');
+                }
+                if (!splited[0]) {
+                    splited[0] = 0;
+                }
+                if (!splited[1]) {
+                    splited[1] = iterable.length - 1;
+                }
+                if (!isInteger(splited[0]) || !isInteger(splited[1])) {
+                    return illegalFilter('not a number');
+                }
+                for (let i = +splited[0]; i <= +splited[1]; i++) {
+                    flag[i - 1] = true;
+                }
+            } else {
+                if (!isInteger(filter)) {
+                    return illegalFilter('not a number');
+                }
+                flag[+filter - 1] = true;
+            }
+        }
+    }
+    const result = [];
+    for (const i in iterable) {
+        if (flag[+i]) {
+            result.push(iterable[+i]);
+        }
+    }
+    return result;
+}
+
 function scrollTo(type) {
+    const scrollSpeed = 50;
+
     if (type !== 'top' && type !== 'bottom') { throw new Error('type error!'); }
 
     const scrollHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
@@ -88,12 +127,13 @@ function scrollTo(type) {
 }
 
 async function printToPdf(width, height, margin, html) {
-    log('print to pdf', width, height, margin, html);
+    log('print to pdf', width, height, margin);
     // await scrollTo('top');
     // await scrollTo('bottom');
+    const pixeledMargin = String(margin).split(' ').map((s) => (s + 'px')).join(' ');
     const printStyle =
         '<style> /* normalize browsers */ html, body { margin: 0 !important; padding: 0 !important; } </style>' +
-        '<style> /* page settings */ @page { size: ' + width + 'px ' + height + 'px; margin: ' + margin + 'px; } </style>' +
+        '<style> /* page settings */ @page { size: ' + width + 'px ' + height + 'px; margin: ' + pixeledMargin + '; } </style>' +
         '<style> div.page { width: ' + (width - margin * 2) + 'px; height: ' + (height - margin * 2) + 'px; } </style>';
     html = printStyle + html;
 
@@ -124,6 +164,8 @@ function generateHtmlFromContent() {
 }
 
 function generateHtmlFromPictures() {
+    const minimalImageSize = 100;
+
     let html = '<style>' +
         'div.page { page-break-after: always; display: flex; justify-content: center; align-items: center; }' +
         'div.page>img { width: 100%; max-width: 100%; max-height: 100%; }' +
@@ -138,6 +180,32 @@ function generateHtmlFromPictures() {
         // log(imageWidth, imageSrc);
     }
     return html;
+}
+
+class Settings {
+    constructor(storageKey = 'mem-print-settings') {
+        const defaultData = {
+            // Page Settings
+            width: 797,   // A4 8.3inch * 11.7inch
+            height: 1123,
+            margin: 0,
+            zoom: 1,
+            // Element filters
+            filter: '',
+        };
+        this.data = {}
+        if (localStorage.getItem(storageKey)) {
+            const storaged = localStorage.getItem(storageKey);
+            if (storaged) {
+                this.data = JSON.parse(storaged);
+            }
+        }
+        for (const key in defaultData) {
+            if (!Object.keys(this.data).includes(key)) {
+                this.data[key] = defaultData[key];
+            }
+        }
+    }
 }
 
 async function main() {
@@ -158,6 +226,9 @@ async function main() {
         return $btn;
     }
 
+    const settings = new Settings();
+    log(settings.data);
+
     $mainContainer = generateDiv('mem-print-main', 'mem-print-container');
     $sideContainer = generateDiv('mem-print-side', 'mem-print-container');
 
@@ -170,16 +241,19 @@ async function main() {
     console.log($mainContainer, $sideContainer);
 
     printContent = () => {
-        printToPdf(pageWidth, pageHeight, pageMargin, generateHtmlFromContent());
+        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromContent());
     }
     $mainContainer.appendChild(generateButton('Print Content', printContent));
     $sideContainer.appendChild(generateButton('Print Content', printContent));
 
     printPictures = () => {
-        printToPdf(pageWidth, pageHeight, pageMargin, generateHtmlFromPictures());
+        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromPictures());
     };
     $mainContainer.appendChild(generateButton('Print Pictures', printPictures));
     $sideContainer.appendChild(generateButton('Print Pictures', printPictures));
+
+    $mainContainer.appendChild(generateButton('Settings', () => { settings.open(); }));
+    $sideContainer.appendChild(generateButton('Settings', () => { settings.open(); }));
 }
 
 document.addEventListener('DOMContentLoaded', main);
