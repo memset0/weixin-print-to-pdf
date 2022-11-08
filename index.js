@@ -1,14 +1,14 @@
 // ==UserScript==
-// @name         微信公众号 PDF 导出脚本
-// @namespace    mem.ac/weixin-print-to-pdf
-// @version      1.2.1
-// @description  方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
-// @author       memset0
-// @license      AGPL-v3.0
-// @match        https://mp.weixin.qq.com/s*
-// @updateUrl    https://cdn.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
-// @downloadUrl  https://cdn.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
-// @run-at       document-start
+// @name                微信公众号 PDF 导出脚本
+// @namespace           mem.ac/weixin-print-to-pdf
+// @version             1.2.2
+// @description         方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
+// @author              memset0
+// @license             AGPL-v3.0
+// @match               https://mp.weixin.qq.com/s*
+// @updateurl           https://cdn.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
+// @downloadurl         https://cdn.jsdelivr.net/gh/memset0/weixin-print-to-pdf/index.js
+// @run-at              document-start
 // ==/UserScript==
 
 const scrollSpeed = 50;
@@ -26,24 +26,6 @@ const pageMargin = 0;
 
 function log(...args) {
     console.log('[@memset0/weixin-print-to-pdf]', ...args);
-}
-
-function transferHtmlToPdf(htmlSource) {
-    // const document = unsafeWindow.document;
-    const blob = new Blob([htmlSource], { type: 'text/html;charset=utf-8' });
-    const blobUrl = URL.createObjectURL(blob);
-    log(blobUrl);
-
-    const $iframe = document.createElement('iframe');
-    $iframe.style.display = 'none';
-    $iframe.src = blobUrl;
-    document.body.appendChild($iframe);
-    $iframe.onload = () => {
-        setTimeout(() => {
-            $iframe.focus();
-            $iframe.contentWindow.print();
-        }, 1);
-    };
 }
 
 function scrollTo(type) {
@@ -92,59 +74,67 @@ function scrollTo(type) {
     });
 }
 
-async function printToPdf(width, height, margin) {
+async function printToPdf(width, height, margin, html) {
+    log('print to pdf', width, height, margin, html);
     // await scrollTo('top');
     // await scrollTo('bottom');
+    const printStyle =
+        '<style> /* normalize browsers */ html, body { margin: 0 !important; padding: 0 !important; } </style>' +
+        '<style> /* page settings */ @page { size: ' + width + 'px ' + height + 'px; margin: ' + margin + 'px; } </style>' +
+        '<style> div.page { width: ' + (width - margin * 2) + 'px; height: ' + (height - margin * 2) + 'px; } </style>';
+    html = printStyle + html;
 
-    let html = '';
+    // const document = unsafeWindow.document;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    log('blob url:', blobUrl);
 
-    // normalize browser
-    html += '<style> html, body { margin: 0 !important; padding: 0 !important; } </style>'
+    const $iframe = document.createElement('iframe');
+    $iframe.style.display = 'none';
+    $iframe.src = blobUrl;
+    document.body.appendChild($iframe);
+    $iframe.onload = () => {
+        setTimeout(() => {
+            $iframe.focus();
+            $iframe.contentWindow.print();
+        }, 1);
+    };
+}
 
-    // style of page containers
-    html += '<style>' +
+function generateHtmlFromPictures() {
+    let html = '<style>' +
         'div.page { page-break-after: always; display: flex; justify-content: center; align-items: center; }' +
         'div.page>img { width: 100%; max-width: 100%; max-height: 100%; }' +
         'div.page>img { border: solid 1px #fff0; } /* this line is magic */' +
         '</style>';
-
-    // page settings
-    html += '<style> @page { size: ' + width + 'px ' + height + 'px; margin: ' + margin + 'px; } </style>';
-    html += '<style> div.page { width: ' + (width - margin * 2) + 'px; height: ' + (height - margin * 2) + 'px; } </style>'
-    console.log(html);
-
     for (const $image of document.getElementById('js_content').querySelectorAll('img')) {
         const imageSrc = $image.getAttribute('data-src');
         const imageWidth = $image.getAttribute('width');
         if (!imageSrc) { continue; }
         if (imageWidth && imageWidth < minimalImageSize) { continue; }
         html += '<div class="page"><img src="' + imageSrc + '"></div>';
-        log(imageWidth, imageSrc);
+        // log(imageWidth, imageSrc);
     }
-
-    // log(html);
-    transferHtmlToPdf(html);
-
-    log('Printed!');
+    return html;
 }
 
-function initizePrintButton() {
-    function generatePrintButton(buttonName) {
-        const $buttonPrint = document.createElement('button');
-        $buttonPrint.innerText = 'Print to PDF'
-        $buttonPrint.style = 'padding-left: 4px; padding-right: 4px;'
-        $buttonPrint.onclick = () => {
-            log('Triggered by', buttonName);
-            printToPdf(pageWidth, pageHeight, pageMargin);
-        }
-        return $buttonPrint;
+function generateButton(buttonName, callback) {
+    const $buttonPrint = document.createElement('button');
+    $buttonPrint.innerText = buttonName;
+    $buttonPrint.style = 'padding-left: 4px; padding-right: 4px;'
+    $buttonPrint.onclick = () => {
+        log('Triggered by', [buttonName], $buttonPrint);
+        callback();
     }
-    document.getElementById('meta_content').appendChild(generatePrintButton());
-    document.getElementsByClassName('qr_code_pc')[0].appendChild(generatePrintButton());
+    return $buttonPrint;
 }
 
 async function main() {
-    initizePrintButton();
+    function printPictures() {
+        printToPdf(pageWidth, pageHeight, pageMargin, generateHtmlFromPictures());
+    }
+    document.getElementById('meta_content').appendChild(generateButton('Print Pictures', printPictures));
+    document.getElementsByClassName('qr_code_pc')[0].appendChild(generateButton('Print Pictures', printPictures));
 }
 
 document.addEventListener('DOMContentLoaded', main);
