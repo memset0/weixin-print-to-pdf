@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                微信公众号 PDF 导出脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.2.2
+// @version             1.3.1
 // @description         方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
@@ -22,7 +22,23 @@ const minimalImageSize = 100;
 const pageWidth = 797 /* 796.8 */;
 const pageHeight = 1123 /* 1123.2 */;
 
+const pageZoom = 1;
+
 const pageMargin = 0;
+
+const CSS = `
+    .mem-print-container {
+    }
+    #mem-print-main {
+        padding: 16px;
+        line-height: 0px;
+        margin-bottom: 20px;
+        border: 1px solid #D9DADC;
+    }
+    #mem-print-main button {
+        margin-right: 8px;
+    }
+`;
 
 function log(...args) {
     console.log('[@memset0/weixin-print-to-pdf]', ...args);
@@ -37,15 +53,12 @@ function scrollTo(type) {
     let scrollRecords = [];
 
     function scrollAnimated(timestamp) {
-        // log('scroll animated', timestamp);
-
         const currentScroll = document.documentElement.scrollTop || document.body.scrollTop;
         scrollRecords.push(currentScroll);
         if (scrollRecords.length > 5) {
             scrollRecords.shift();
             let finishedFlag = true;
             for (let i = 1; i < scrollRecords.length; i++) {
-                // log('!!!', i, scrollRecords[i], scrollRecords[i - 1], scrollRecords[i] !== scrollRecords[i - 1]);
                 if (scrollRecords[i] !== scrollRecords[i - 1]) {
                     finishedFlag = false;
                     break;
@@ -84,7 +97,7 @@ async function printToPdf(width, height, margin, html) {
         '<style> div.page { width: ' + (width - margin * 2) + 'px; height: ' + (height - margin * 2) + 'px; } </style>';
     html = printStyle + html;
 
-    // const document = unsafeWindow.document;
+    // const document = unsafeWindow.document;   // seemingly needless
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const blobUrl = URL.createObjectURL(blob);
     log('blob url:', blobUrl);
@@ -99,6 +112,15 @@ async function printToPdf(width, height, margin, html) {
             $iframe.contentWindow.print();
         }, 1);
     };
+}
+
+function generateHtmlFromContent() {
+    let html = '';
+    for (const $element of document.getElementById('js_content').children) {
+        console.log($element);
+        html += $element.outerHTML + '\n\n';
+    }
+    return html;
 }
 
 function generateHtmlFromPictures() {
@@ -118,23 +140,46 @@ function generateHtmlFromPictures() {
     return html;
 }
 
-function generateButton(buttonName, callback) {
-    const $buttonPrint = document.createElement('button');
-    $buttonPrint.innerText = buttonName;
-    $buttonPrint.style = 'padding-left: 4px; padding-right: 4px;'
-    $buttonPrint.onclick = () => {
-        log('Triggered by', [buttonName], $buttonPrint);
-        callback();
-    }
-    return $buttonPrint;
-}
-
 async function main() {
-    function printPictures() {
-        printToPdf(pageWidth, pageHeight, pageMargin, generateHtmlFromPictures());
+    function generateDiv(id, className) {
+        const $div = document.createElement('div');
+        $div.id = id;
+        $div.className = className;
+        return $div;
     }
-    document.getElementById('meta_content').appendChild(generateButton('Print Pictures', printPictures));
-    document.getElementsByClassName('qr_code_pc')[0].appendChild(generateButton('Print Pictures', printPictures));
+    function generateButton(buttonName, callback) {
+        const $btn = document.createElement('button');
+        $btn.innerText = buttonName;
+        $btn.style = 'padding-left: 4px; padding-right: 4px;'
+        $btn.onclick = () => {
+            log('Triggered by', [buttonName], $btn);
+            callback();
+        }
+        return $btn;
+    }
+
+    $mainContainer = generateDiv('mem-print-main', 'mem-print-container');
+    $sideContainer = generateDiv('mem-print-side', 'mem-print-container');
+
+    $style = document.createElement('style');
+    $style.innerHTML = CSS;
+    $mainContainer.appendChild($style);
+
+    document.getElementsByClassName('qr_code_pc')[0].appendChild($sideContainer);
+    document.getElementById('img-content').parentNode.insertBefore($mainContainer, document.getElementById('img-content'));
+    console.log($mainContainer, $sideContainer);
+
+    printContent = () => {
+        printToPdf(pageWidth, pageHeight, pageMargin, generateHtmlFromContent());
+    }
+    $mainContainer.appendChild(generateButton('Print Content', printContent));
+    $sideContainer.appendChild(generateButton('Print Content', printContent));
+
+    printPictures = () => {
+        printToPdf(pageWidth, pageHeight, pageMargin, generateHtmlFromPictures());
+    };
+    $mainContainer.appendChild(generateButton('Print Pictures', printPictures));
+    $sideContainer.appendChild(generateButton('Print Pictures', printPictures));
 }
 
 document.addEventListener('DOMContentLoaded', main);
