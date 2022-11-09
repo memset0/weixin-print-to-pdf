@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name                微信公众号 PDF 导出脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.5.1
-// @description         方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
+// @version             1.6.1
+// @description         方便地打印微信公众号文章，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
 // @match               https://mp.weixin.qq.com/s*
@@ -22,7 +22,8 @@ const CSS = `
         margin-right: 6px;
     }
     .mem-print-filter-applied {
-        background: red;
+        background: rgba(255, 0, 0, .3);
+        border-left: 5px solid red;
     }
     #mem-print-main {
         line-height: 0px;
@@ -326,8 +327,14 @@ class Settings {
     }
 }
 
-function renderFilter() {
-
+function renderFilter(filter) {
+    const $content = Array.from(document.getElementById('js_content').children);
+    for (const i in $content) {
+        $content[i].classList.add('mem-print-filter-applied');
+    }
+    for (const i of applyFilter($content.map((_, i) => i), filter)) {
+        $content[i].classList.remove('mem-print-filter-applied');
+    }
 }
 
 async function main() {
@@ -342,7 +349,7 @@ async function main() {
         $btn.innerText = buttonName;
         $btn.style = 'padding-left: 4px; padding-right: 4px;'
         $btn.onclick = () => {
-            log('Triggered by', [buttonName], $btn);
+            log('trigger', [buttonName], $btn);
             callback();
         }
         return $btn;
@@ -374,11 +381,11 @@ async function main() {
     $mainContainer.appendChild(generateButton('Print Pictures', printPictures));
     $sideContainer.appendChild(generateButton('Print Pictures', printPictures));
 
-    // previewFilters = () => {
-    //     renderFilter();
-    // };
-    // $mainContainer.appendChild(generateButton('Preview Filters', previewFilters));
-    // $sideContainer.appendChild(generateButton('Preview Filters', previewFilters));
+    previewFilters = () => {
+        renderFilter(settings.data.filter);
+    };
+    $mainContainer.appendChild(generateButton('Preview Filters', previewFilters));
+    $sideContainer.appendChild(generateButton('Preview Filters', previewFilters));
 
     $mainContainer.appendChild(generateButton('Settings', () => { settings.openWindow(); }));
     $sideContainer.appendChild(generateButton('Settings', () => { settings.openWindow(); }));
