@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                微信公众号 PDF 导出脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.4.2
+// @version             1.5.1
 // @description         方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
@@ -20,6 +20,9 @@ const CSS = `
     }
     .mem-print-settings-btn-group button {
         margin-right: 6px;
+    }
+    .mem-print-filter-applied {
+        background: red;
     }
     #mem-print-main {
         line-height: 0px;
@@ -86,7 +89,7 @@ function applyFilter(iterable, filterPattern) {
             }
         }
     }
-    log('apply filter:', filter, flag);
+    log('apply filter:', filter, flag, iterable);
     const result = [];
     for (const i in iterable) {
         if (flag[+i]) {
@@ -141,7 +144,8 @@ function scrollTo(type) {
     });
 }
 
-async function printToPdf(width, height, margin, html) {
+async function printToPdf(options, html) {
+    const { width, height, margin } = options;
     log('print to pdf', width, height, margin);
     // await scrollTo('top');
     // await scrollTo('bottom');
@@ -151,6 +155,19 @@ async function printToPdf(width, height, margin, html) {
         '<style> /* page settings */ @page { size: ' + width + 'px ' + height + 'px; margin: ' + pixeledMargin + '; } </style>' +
         '<style> div.page { width: ' + (width - margin * 2) + 'px; height: ' + (height - margin * 2) + 'px; } </style>';
     html = printStyle + html;
+
+    const { zoom } = options;
+    if (+zoom !== 1) {
+        html += '<style>body { zoom: ' + zoom + '; }</style>';
+    }
+
+    const { customJS, customCSS } = options;
+    if (customJS) {
+        html += '\n\n\n<!-- Custom JS --><script>' + customCSS + '</script>\n\n\n';
+    }
+    if (customCSS) {
+        html += '\n\n\n<!-- Custom CSS --><style>' + customCSS + '</style>\n\n\n';
+    }
 
     // const document = unsafeWindow.document;   // seemingly needless
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
@@ -186,7 +203,7 @@ function generateHtmlFromPictures(options) {
         'div.page>img { width: 100%; max-width: 100%; max-height: 100%; }' +
         'div.page>img { border: solid 1px #fff0; } /* this line is magic */' +
         '</style>';
-    for (const $image of applyFilter(document.getElementById('js_content').querySelectorAll('img'), options.filter)) {
+    for (const $image of document.getElementById('js_content').querySelectorAll('img')) {
         const imageSrc = $image.getAttribute('data-src');
         const imageWidth = $image.getAttribute('width');
         if (!imageSrc) { continue; }
@@ -284,6 +301,9 @@ class Settings {
             zoom: 1,
             // Element filters
             filter: '',
+            // Custom style,
+            customJS: '',
+            customCSS: '',
         };
         if (localStorage.getItem(storageKey)) {
             const storaged = localStorage.getItem(storageKey);
@@ -304,6 +324,10 @@ class Settings {
             alert('Your browser doesn\'t support <dialog>, settings may not work.')
         }
     }
+}
+
+function renderFilter() {
+
 }
 
 async function main() {
@@ -339,16 +363,22 @@ async function main() {
     console.log($mainContainer, $sideContainer);
 
     printContent = () => {
-        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromContent(settings.data));
+        printToPdf(settings.data, generateHtmlFromContent(settings.data));
     }
     $mainContainer.appendChild(generateButton('Print Content', printContent));
     $sideContainer.appendChild(generateButton('Print Content', printContent));
 
     printPictures = () => {
-        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromPictures(settings.data));
+        printToPdf(settings.data, generateHtmlFromPictures(settings.data));
     };
     $mainContainer.appendChild(generateButton('Print Pictures', printPictures));
     $sideContainer.appendChild(generateButton('Print Pictures', printPictures));
+
+    // previewFilters = () => {
+    //     renderFilter();
+    // };
+    // $mainContainer.appendChild(generateButton('Preview Filters', previewFilters));
+    // $sideContainer.appendChild(generateButton('Preview Filters', previewFilters));
 
     $mainContainer.appendChild(generateButton('Settings', () => { settings.openWindow(); }));
     $sideContainer.appendChild(generateButton('Settings', () => { settings.openWindow(); }));
