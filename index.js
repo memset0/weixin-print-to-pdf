@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                微信公众号 PDF 导出脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.6.1
+// @version             1.6.2
 // @description         方便地打印微信公众号文章，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
@@ -100,6 +100,10 @@ function applyFilter(iterable, filterPattern) {
     return result;
 }
 
+function applyFilterJS(filterScript) {
+    return eval('(element, index) => {' + filterScript + '};');
+}
+
 function scrollTo(type) {
     const scrollSpeed = 50;
 
@@ -162,10 +166,7 @@ async function printToPdf(options, html) {
         html += '<style>body { zoom: ' + zoom + '; }</style>';
     }
 
-    const { customJS, customCSS } = options;
-    if (customJS) {
-        html += '\n\n\n<!-- Custom JS --><script>' + customCSS + '</script>\n\n\n';
-    }
+    const { customCSS } = options;
     if (customCSS) {
         html += '\n\n\n<!-- Custom CSS --><style>' + customCSS + '</style>\n\n\n';
     }
@@ -189,9 +190,11 @@ async function printToPdf(options, html) {
 
 function generateHtmlFromContent(options) {
     let html = '';
+    const funcFilter = applyFilterJS(options.filterJS);
     for (const $element of applyFilter(document.getElementById('js_content').children, options.filter)) {
-        console.log($element);
-        html += $element.outerHTML + '\n\n';
+        if (!funcFilter($element)) {
+            html += $element.outerHTML + '\n\n';
+        }
     }
     return html;
 }
@@ -302,8 +305,8 @@ class Settings {
             zoom: 1,
             // Element filters
             filter: '',
+            filterJS: '',
             // Custom style,
-            customJS: '',
             customCSS: '',
         };
         if (localStorage.getItem(storageKey)) {
@@ -327,13 +330,18 @@ class Settings {
     }
 }
 
-function renderFilter(filter) {
+function renderFilter(options) {
+    const { filter, filterJS } = options;
+    const funcFilter = applyFilterJS(filterJS);
+
     const $content = Array.from(document.getElementById('js_content').children);
     for (const i in $content) {
         $content[i].classList.add('mem-print-filter-applied');
     }
     for (const i of applyFilter($content.map((_, i) => i), filter)) {
-        $content[i].classList.remove('mem-print-filter-applied');
+        if (!funcFilter($content[i])) {
+            $content[i].classList.remove('mem-print-filter-applied');
+        }
     }
 }
 
@@ -382,7 +390,7 @@ async function main() {
     $sideContainer.appendChild(generateButton('Print Pictures', printPictures));
 
     previewFilters = () => {
-        renderFilter(settings.data.filter);
+        renderFilter(settings.data);
     };
     $mainContainer.appendChild(generateButton('Preview Filters', previewFilters));
     $sideContainer.appendChild(generateButton('Preview Filters', previewFilters));
