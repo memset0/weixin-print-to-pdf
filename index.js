@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                微信公众号 PDF 导出脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.4.1
+// @version             1.4.2
 // @description         方便地导出公众号文章中以图片形式上传的试卷，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
@@ -14,11 +14,18 @@
 const CSS = `
     .mem-print-container {
     }
-    #mem-print-main {
+    .mem-print-settings {
+        margin: auto;
         padding: 16px;
+    }
+    .mem-print-settings-btn-group button {
+        margin-right: 6px;
+    }
+    #mem-print-main {
         line-height: 0px;
         margin-bottom: 20px;
-        border: 1px solid #D9DADC;
+        /* padding: 16px;
+        border: 1px solid #D9DADC; */
     }
     #mem-print-main button {
         margin-right: 8px;
@@ -61,17 +68,25 @@ function applyFilter(iterable, filterPattern) {
                 if (!isInteger(splited[0]) || !isInteger(splited[1])) {
                     return illegalFilter('not a number');
                 }
-                for (let i = +splited[0]; i <= +splited[1]; i++) {
-                    flag[i - 1] = true;
+                for (let i = +splited[0] - 1; i < +splited[1]; i++) {
+                    if (i < 0 || i >= flag.length) {
+                        return illegalFilter('out of range');
+                    }
+                    flag[i] = true;
                 }
             } else {
                 if (!isInteger(filter)) {
                     return illegalFilter('not a number');
                 }
-                flag[+filter - 1] = true;
+                const x = +filter - 1;
+                if (x < 0 || x >= flag.length) {
+                    return illegalFilter('out of range');
+                }
+                flag[x] = true;
             }
         }
     }
+    log('apply filter:', filter, flag);
     const result = [];
     for (const i in iterable) {
         if (flag[+i]) {
@@ -154,16 +169,16 @@ async function printToPdf(width, height, margin, html) {
     };
 }
 
-function generateHtmlFromContent() {
+function generateHtmlFromContent(options) {
     let html = '';
-    for (const $element of document.getElementById('js_content').children) {
+    for (const $element of applyFilter(document.getElementById('js_content').children, options.filter)) {
         console.log($element);
         html += $element.outerHTML + '\n\n';
     }
     return html;
 }
 
-function generateHtmlFromPictures() {
+function generateHtmlFromPictures(options) {
     const minimalImageSize = 100;
 
     let html = '<style>' +
@@ -171,7 +186,7 @@ function generateHtmlFromPictures() {
         'div.page>img { width: 100%; max-width: 100%; max-height: 100%; }' +
         'div.page>img { border: solid 1px #fff0; } /* this line is magic */' +
         '</style>';
-    for (const $image of document.getElementById('js_content').querySelectorAll('img')) {
+    for (const $image of applyFilter(document.getElementById('js_content').querySelectorAll('img'), options.filter)) {
         const imageSrc = $image.getAttribute('data-src');
         const imageWidth = $image.getAttribute('width');
         if (!imageSrc) { continue; }
@@ -183,8 +198,85 @@ function generateHtmlFromPictures() {
 }
 
 class Settings {
+    createElement() {
+        this.$inputs = {};
+
+        const $dialog = document.createElement('dialog');
+        $dialog.innerHTML = '<h1 class="mem-print-settings-title">Settings</h1>';
+        $dialog.className = 'mem-print-settings';
+
+        for (const name of Object.keys(this.defaults)) {
+            const $label = document.createElement('label');
+            const $input = document.createElement('input');
+            this.$inputs[name] = $input;
+
+            $label.innerText = name;
+            if (this.defaults[name] !== '') {
+                $label.innerText += '(default: ' + this.defaults[name] + ')'
+            }
+            $label.innerText += ':  ';
+
+            $input.name = name;
+            $input.value = this.data[name];
+            $input.onblur = (event) => {
+                log('update', $input.name, $input.value);
+                this.updates[$input.name] = $input.value;
+            };
+
+            $label.appendChild($input);
+            $dialog.appendChild($label);
+            $dialog.appendChild(document.createElement('br'));
+        }
+
+        const $btnGroup = document.createElement('div');
+        $btnGroup.className = 'mem-print-settings-btn-group';
+        $dialog.appendChild($btnGroup);
+
+        const $resetButton = document.createElement('button');
+        $resetButton.innerText = 'Reset';
+        $resetButton.name = 'reset';
+        $resetButton.onclick = () => this.closeWindow(this.defaults);
+        $btnGroup.appendChild($resetButton);
+
+        const $cancelButton = document.createElement('button');
+        $cancelButton.innerText = 'Cancel';
+        $cancelButton.name = 'cancel';
+        $cancelButton.onclick = () => this.closeWindow({});
+        $btnGroup.appendChild($cancelButton);
+
+        const $submitButton = document.createElement('button');
+        $submitButton.innerText = 'Submit';
+        $submitButton.name = 'submit';
+        $submitButton.onclick = () => this.closeWindow(this.updates);
+        $btnGroup.appendChild($submitButton);
+
+        return $dialog;
+    }
+
+    openWindow() {
+        this.updates = {};
+        for (const name in this.$inputs) {
+            // log('dialog open:', name, this.data[name], this.$inputs[name].value);
+            this.$inputs[name].value = this.data[name];
+        }
+        this.$element.showModal();
+    }
+
+    closeWindow(update = null) {
+        if (update && Object.keys(update).length) {
+            for (const key in update) {
+                this.data[key] = update[key];
+            }
+            localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+        }
+        log('dialog closed:', update, this.data);
+        this.$element.close();
+    }
+
     constructor(storageKey = 'mem-print-settings') {
-        const defaultData = {
+        this.storageKey = storageKey;
+        this.data = {};
+        this.defaults = {
             // Page Settings
             width: 797,   // A4 8.3inch * 11.7inch
             height: 1123,
@@ -193,17 +285,23 @@ class Settings {
             // Element filters
             filter: '',
         };
-        this.data = {}
         if (localStorage.getItem(storageKey)) {
             const storaged = localStorage.getItem(storageKey);
             if (storaged) {
                 this.data = JSON.parse(storaged);
             }
         }
-        for (const key in defaultData) {
+        for (const key in this.defaults) {
             if (!Object.keys(this.data).includes(key)) {
-                this.data[key] = defaultData[key];
+                this.data[key] = this.defaults[key];
             }
+        }
+
+        this.$element = this.createElement();
+        document.body.appendChild(this.$element);
+        if (typeof this.$element.showModal !== 'function') {
+            this.$element.hidden = true;
+            alert('Your browser doesn\'t support <dialog>, settings may not work.')
         }
     }
 }
@@ -241,19 +339,19 @@ async function main() {
     console.log($mainContainer, $sideContainer);
 
     printContent = () => {
-        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromContent());
+        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromContent(settings.data));
     }
     $mainContainer.appendChild(generateButton('Print Content', printContent));
     $sideContainer.appendChild(generateButton('Print Content', printContent));
 
     printPictures = () => {
-        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromPictures());
+        printToPdf(settings.data.width, settings.data.height, settings.data.margin, generateHtmlFromPictures(settings.data));
     };
     $mainContainer.appendChild(generateButton('Print Pictures', printPictures));
     $sideContainer.appendChild(generateButton('Print Pictures', printPictures));
 
-    $mainContainer.appendChild(generateButton('Settings', () => { settings.open(); }));
-    $sideContainer.appendChild(generateButton('Settings', () => { settings.open(); }));
+    $mainContainer.appendChild(generateButton('Settings', () => { settings.openWindow(); }));
+    $sideContainer.appendChild(generateButton('Settings', () => { settings.openWindow(); }));
 }
 
 document.addEventListener('DOMContentLoaded', main);
