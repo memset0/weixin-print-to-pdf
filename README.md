@@ -39,4 +39,3 @@
 |  filter   |                 （仅 Content 模式）按行元素过滤器，使用类似于打印页面选择器的语法，允许自定义被打印的元素区间                  |
 | filterJS  | （仅 Content 模式）JS 过滤器，将会提供 DOM Node 类型的 element，返回非零值表示删除；也支持通过这一功能对 DOM Tree 进行修改 |
 | customCSS |                                           自定义 CSS 样式，将会被应用到打印页面                                            |
-                                                            |
