@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name                微信公众号 PDF 导出脚本
+// @name                微信公众号推文打印脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.6.2
-// @description         方便地打印微信公众号文章，让您一键开卷！
+// @version             1.6.3
+// @description         方便地打印或以 PDF 形式导出微信公众号文章，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
 // @match               https://mp.weixin.qq.com/s*
