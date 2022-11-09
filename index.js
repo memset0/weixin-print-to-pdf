@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name                微信公众号推文打印脚本
 // @namespace           mem.ac/weixin-print-to-pdf
-// @version             1.6.3
+// @version             1.6.4
 // @description         方便地打印或以 PDF 形式导出微信公众号文章，让您一键开卷！
 // @author              memset0
 // @license             AGPL-v3.0
@@ -17,9 +17,27 @@ const CSS = `
     .mem-print-settings {
         margin: auto;
         padding: 16px;
+        font-size: 13px;
+        line-height: 24px;
+        letter-spacing: -.2px;
+    }
+    .mem-print-settings-title {
+        font-weight: bold;
+        font-size: 21px;
+        margin-top: 12px;
+        margin-bottom: 12px;
+    }
+    .mem-print-settings-title a {
+        color: red;
+        font-size: 13px;
+    }
+    .mem-print-settings-btn-group {
+        margin-top: 8px;
+        margin-bottom: 4px;
     }
     .mem-print-settings-btn-group button {
-        margin-right: 6px;
+        margin-right: 12px;
+        padding: 2px 4px;
     }
     .mem-print-filter-applied {
         background: rgba(255, 0, 0, .3);
@@ -223,7 +241,12 @@ class Settings {
         this.$inputs = {};
 
         const $dialog = document.createElement('dialog');
-        $dialog.innerHTML = '<h1 class="mem-print-settings-title">Settings</h1>';
+        $dialog.innerHTML = `
+            <h1 class="mem-print-settings-title">
+                Settings
+                <a target="_blank" href="https://github.com/memset0/weixin-print-to-pdf">(?)</a>
+            </h1>
+        `;
         $dialog.className = 'mem-print-settings';
 
         for (const name of Object.keys(this.defaults)) {
