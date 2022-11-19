@@ -4,7 +4,7 @@
 
 ![](https://static.memset0.cn/img/v5/2022/10/04/633b16a0182db.png)
 
-### 使用方法
+## 使用方法
 
 **Step 1.**：安装 Tamper Monkey 或者 Script Cat (Recommended) 插件，作为油猴脚本的运行时支持。
 
